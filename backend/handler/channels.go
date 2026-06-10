@@ -1,0 +1,183 @@
+package handler
+
+import (
+	"strconv"
+
+	"ai-chat-platform/backend/model"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type ChannelHandler struct {
+	DB *gorm.DB
+}
+
+type channelPayload struct {
+	Name              string   `json:"name"`
+	ProviderType      string   `json:"provider_type"`
+	BaseURL           string   `json:"base_url"`
+	APIKey            string   `json:"api_key"`
+	Organization      string   `json:"organization"`
+	GroupName         string   `json:"group_name"`
+	ModelNames        []string `json:"model_names"`
+	ModelMapping      string   `json:"model_mapping"`
+	ExtraHeaders      string   `json:"extra_headers"`
+	RequestTemplate   string   `json:"request_template"`
+	ResponseTemplate  string   `json:"response_template"`
+	Weight            int      `json:"weight"`
+	Priority          int      `json:"priority"`
+	Enabled           bool     `json:"enabled"`
+	RateLimited       bool     `json:"rate_limited"`
+	MaxRequestsMinute int      `json:"max_requests_minute"`
+	TestModel         string   `json:"test_model"`
+	Remark            string   `json:"remark"`
+}
+
+func (h ChannelHandler) List(c *gin.Context) {
+	var items []model.ProviderChannel
+	query := h.DB.Order("priority desc, weight desc, id asc")
+
+	if providerType := c.Query("provider_type"); providerType != "" {
+		query = query.Where("provider_type = ?", providerType)
+	}
+	if groupName := c.Query("group_name"); groupName != "" {
+		query = query.Where("group_name = ?", groupName)
+	}
+	if enabled := c.Query("enabled"); enabled != "" {
+		query = query.Where("enabled = ?", enabled == "true")
+	}
+
+	if err := query.Find(&items).Error; err != nil {
+		fail(c, 500, "failed to list channels")
+		return
+	}
+
+	success(c, gin.H{"items": items})
+}
+
+func (h ChannelHandler) Get(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		fail(c, 400, "invalid channel id")
+		return
+	}
+
+	var item model.ProviderChannel
+	if err := h.DB.First(&item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			fail(c, 404, "channel not found")
+			return
+		}
+		fail(c, 500, "failed to get channel")
+		return
+	}
+
+	success(c, item)
+}
+
+func (h ChannelHandler) Create(c *gin.Context) {
+	var payload channelPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		fail(c, 400, "invalid request body")
+		return
+	}
+
+	if payload.Name == "" || payload.ProviderType == "" || payload.BaseURL == "" || payload.GroupName == "" {
+		fail(c, 400, "name, provider_type, base_url and group_name are required")
+		return
+	}
+
+	item := model.ProviderChannel{
+		Name:              payload.Name,
+		ProviderType:      payload.ProviderType,
+		BaseURL:           payload.BaseURL,
+		APIKey:            payload.APIKey,
+		Organization:      payload.Organization,
+		GroupName:         payload.GroupName,
+		ModelNames:        payload.ModelNames,
+		ModelMapping:      payload.ModelMapping,
+		ExtraHeaders:      payload.ExtraHeaders,
+		RequestTemplate:   payload.RequestTemplate,
+		ResponseTemplate:  payload.ResponseTemplate,
+		Weight:            payload.Weight,
+		Priority:          payload.Priority,
+		Enabled:           payload.Enabled,
+		RateLimited:       payload.RateLimited,
+		MaxRequestsMinute: payload.MaxRequestsMinute,
+		TestModel:         payload.TestModel,
+		Remark:            payload.Remark,
+	}
+
+	if err := h.DB.Create(&item).Error; err != nil {
+		fail(c, 500, "failed to create channel")
+		return
+	}
+
+	success(c, item)
+}
+
+func (h ChannelHandler) Update(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		fail(c, 400, "invalid channel id")
+		return
+	}
+
+	var payload channelPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		fail(c, 400, "invalid request body")
+		return
+	}
+
+	var item model.ProviderChannel
+	if err := h.DB.First(&item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			fail(c, 404, "channel not found")
+			return
+		}
+		fail(c, 500, "failed to load channel")
+		return
+	}
+
+	item.Name = payload.Name
+	item.ProviderType = payload.ProviderType
+	item.BaseURL = payload.BaseURL
+	item.APIKey = payload.APIKey
+	item.Organization = payload.Organization
+	item.GroupName = payload.GroupName
+	item.ModelNames = payload.ModelNames
+	item.ModelMapping = payload.ModelMapping
+	item.ExtraHeaders = payload.ExtraHeaders
+	item.RequestTemplate = payload.RequestTemplate
+	item.ResponseTemplate = payload.ResponseTemplate
+	item.Weight = payload.Weight
+	item.Priority = payload.Priority
+	item.Enabled = payload.Enabled
+	item.RateLimited = payload.RateLimited
+	item.MaxRequestsMinute = payload.MaxRequestsMinute
+	item.TestModel = payload.TestModel
+	item.Remark = payload.Remark
+
+	if err := h.DB.Save(&item).Error; err != nil {
+		fail(c, 500, "failed to update channel")
+		return
+	}
+
+	success(c, item)
+}
+
+func (h ChannelHandler) Delete(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		fail(c, 400, "invalid channel id")
+		return
+	}
+
+	if err := h.DB.Delete(&model.ProviderChannel{}, id).Error; err != nil {
+		fail(c, 500, "failed to delete channel")
+		return
+	}
+
+	success(c, gin.H{"deleted": true})
+}
