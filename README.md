@@ -50,9 +50,14 @@ CORS_ALLOW_ORIGIN=http://localhost:5173
 DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=admin123456
 
-DEFAULT_MODEL_NAME=gpt-5.5
-DEFAULT_MODEL_PROVIDER=openai-compatible
-DEFAULT_MODEL_GROUP=codex专用分组
+DEFAULT_MODEL_NAME=deepseek-chat
+DEFAULT_MODEL_PROVIDER=deepseek
+DEFAULT_MODEL_GROUP=codex-group
+
+REQUEST_TIMEOUT_SECONDS=60
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_API_KEY=
+DEEPSEEK_CHANNEL_NAME=DeepSeek Default Channel
 ```
 
 ## 如何运行
@@ -121,6 +126,10 @@ http://localhost:8080
 - `PUT /api/options/:id`
 - `DELETE /api/options/:id`
 
+### 平台网关接口
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+
 ## 默认初始化内容
 
 项目首次启动后端时会自动创建：
@@ -128,7 +137,8 @@ http://localhost:8080
 - SQLite 数据库文件
 - 默认管理员账户
 - 默认模型 `gpt-5.5`
-- 默认分组 `codex专用分组`
+- 默认 DeepSeek 渠道和模型能力映射
+- 默认分组 `codex-group`
 - 默认系统配置项
 
 说明：当前版本还没有登录接口，默认管理员主要用于后续扩展。

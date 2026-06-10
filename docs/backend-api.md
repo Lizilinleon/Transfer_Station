@@ -195,3 +195,34 @@ DELETE /api/usage-logs/:id
 2. 能力映射 `abilities`
 3. 会话与消息
 4. 用量日志与计费
+
+## 11. DeepSeek 网关准备
+
+当前项目已经增加一条最小可用的 DeepSeek 网关链路：
+
+- 平台密钥鉴权：`Authorization: Bearer sk-...`
+- 模型列表：`GET /v1/models`
+- 对话转发：`POST /v1/chat/completions`
+
+你需要准备并填写的内容：
+
+- `.env` 里的 `DEEPSEEK_API_KEY`
+- `.env` 里的 `DEEPSEEK_BASE_URL`
+- 数据库中渠道 `channels` 的 DeepSeek 配置
+- 数据库中能力映射 `abilities` 的模型到渠道关系
+
+当前保留为空、等真实接入时填写的字段：
+
+- `channels.api_key`
+- `channels.model_mapping`
+- `channels.extra_headers`
+- `channels.request_template`
+- `channels.response_template`
+- `api_keys.billing_config`
+
+说明：
+
+- `/v1/chat/completions` 当前只做非流式转发
+- `stream=true` 先返回预留提示
+- 调用成功后会写入 `usage_logs`
+- 会按 `models` 表中的价格字段计算成本并扣减 `api_keys` 额度

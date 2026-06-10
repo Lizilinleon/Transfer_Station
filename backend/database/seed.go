@@ -21,8 +21,9 @@ func seedDefaults(db *gorm.DB, cfg config.Config) error {
 			Username:     cfg.DefaultAdminUsername,
 			PasswordHash: util.HashSHA256(cfg.DefaultAdminPassword),
 			Role:         "admin",
-			DisplayName:  "默认管理员",
+			DisplayName:  "Default Admin",
 			Status:       "active",
+			GroupName:    cfg.DefaultModelGroup,
 		}
 		if err := db.Create(&admin).Error; err != nil {
 			return fmt.Errorf("create default admin: %w", err)
@@ -36,18 +37,66 @@ func seedDefaults(db *gorm.DB, cfg config.Config) error {
 		}
 
 		defaultModel = model.AIModel{
-			Name:        cfg.DefaultModelName,
-			DisplayName: cfg.DefaultModelName,
-			Provider:    cfg.DefaultModelProvider,
-			GroupName:   cfg.DefaultModelGroup,
-			BaseURL:     "https://api.example.com/v1",
-			Description: "默认模型，占位用于本地开发联调。",
-			Enabled:     true,
-			IsDefault:   true,
-			SortOrder:   1,
+			Name:            cfg.DefaultModelName,
+			DisplayName:     cfg.DefaultModelName,
+			Provider:        cfg.DefaultModelProvider,
+			GroupName:       cfg.DefaultModelGroup,
+			BaseURL:         cfg.DeepSeekBaseURL,
+			Description:     "Default model prepared for DeepSeek gateway integration.",
+			Enabled:         true,
+			IsDefault:       true,
+			SupportsStream:  true,
+			ContextWindow:   64000,
+			MaxOutputTokens: 8000,
+			SortOrder:       1,
 		}
 		if err := db.Create(&defaultModel).Error; err != nil {
 			return fmt.Errorf("create default model: %w", err)
+		}
+	}
+
+	defaultChannel := model.ProviderChannel{}
+	if err := db.Where("name = ?", cfg.DeepSeekChannelName).First(&defaultChannel).Error; err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
+
+		defaultChannel = model.ProviderChannel{
+			Name:             cfg.DeepSeekChannelName,
+			ProviderType:     "deepseek",
+			BaseURL:          cfg.DeepSeekBaseURL,
+			APIKey:           cfg.DeepSeekAPIKey,
+			GroupName:        cfg.DefaultModelGroup,
+			ModelNames:       []string{cfg.DefaultModelName},
+			Enabled:          true,
+			Priority:         100,
+			Weight:           100,
+			TestModel:        cfg.DefaultModelName,
+			RequestTemplate:  "",
+			ResponseTemplate: "",
+			Remark:           "Default DeepSeek channel. Keep API key empty until real upstream credentials are ready.",
+		}
+		if err := db.Create(&defaultChannel).Error; err != nil {
+			return fmt.Errorf("create default deepseek channel: %w", err)
+		}
+	}
+
+	defaultAbility := model.ModelAbility{}
+	if err := db.Where("group_name = ? AND model_name = ? AND channel_id = ?", cfg.DefaultModelGroup, cfg.DefaultModelName, defaultChannel.ID).First(&defaultAbility).Error; err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
+
+		defaultAbility = model.ModelAbility{
+			GroupName: cfg.DefaultModelGroup,
+			ModelName: cfg.DefaultModelName,
+			ChannelID: defaultChannel.ID,
+			Enabled:   true,
+			Priority:  100,
+			Weight:    100,
+		}
+		if err := db.Create(&defaultAbility).Error; err != nil {
+			return fmt.Errorf("create default model ability: %w", err)
 		}
 	}
 
@@ -56,19 +105,25 @@ func seedDefaults(db *gorm.DB, cfg config.Config) error {
 			OptionKey:   "site_name",
 			OptionValue: cfg.AppName,
 			Category:    "general",
-			Description: "站点名称",
+			Description: "Site name",
 		},
 		{
 			OptionKey:   "default_model",
 			OptionValue: cfg.DefaultModelName,
 			Category:    "model",
-			Description: "默认模型名称",
+			Description: "Default model name",
 		},
 		{
 			OptionKey:   "default_group",
 			OptionValue: cfg.DefaultModelGroup,
 			Category:    "model",
-			Description: "默认模型分组",
+			Description: "Default model group",
+		},
+		{
+			OptionKey:   "deepseek_base_url",
+			OptionValue: cfg.DeepSeekBaseURL,
+			Category:    "gateway",
+			Description: "Default DeepSeek upstream base URL",
 		},
 	}
 

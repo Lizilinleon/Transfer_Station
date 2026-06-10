@@ -26,6 +26,7 @@ import {
 import "./styles/app.css";
 
 const API_BASE = "http://localhost:8080";
+const DEFAULT_GROUP = "codex-group";
 
 const navItems = [
   { label: "秘钥管理", path: "/app/keys", active: true },
@@ -66,7 +67,7 @@ function AnnouncementBar() {
     <div className="announcement">
       <span className="announce-icon"><Megaphone size={16} /></span>
       <strong>公告</strong>
-      <span className="announce-text">本平台提供稳定的 AI 服务测试环境，企业合作请联系客服。</span>
+      <span className="announce-text">当前已预留 DeepSeek 真正接入所需的渠道、能力映射和平台密钥结构。</span>
     </div>
   );
 }
@@ -125,7 +126,7 @@ function KeyEditor({ draft, title, availableModels, onChange, onToggleModel, onS
       <div className="editor-head">
         <div>
           <h3>{title}</h3>
-          <p>这里已经接入后端字段结构，保存后会直接写入 SQLite 数据库。</p>
+          <p>保存后会直接写入 SQLite，并可用于后续 DeepSeek 平台密钥调用。</p>
         </div>
         <button className="table-icon-btn" onClick={onCancel} type="button" aria-label="关闭编辑面板">
           <X size={18} />
@@ -261,7 +262,7 @@ function mapKeyItem(item) {
 
 function KeysPage() {
   const [rows, setRows] = useState([]);
-  const [availableModels, setAvailableModels] = useState(["gpt-5.5"]);
+  const [availableModels, setAvailableModels] = useState(["deepseek-chat"]);
   const [searchText, setSearchText] = useState("");
   const [showEditor, setShowEditor] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -270,7 +271,7 @@ function KeysPage() {
   const [draft, setDraft] = useState({
     name: "",
     quota: 100,
-    modelNames: ["gpt-5.5"]
+    modelNames: ["deepseek-chat"]
   });
 
   async function fetchModels() {
@@ -278,7 +279,7 @@ function KeysPage() {
     const result = await response.json();
     const items = result?.data?.items || [];
     if (!items.length) {
-      return ["gpt-5.5"];
+      return ["deepseek-chat"];
     }
     return items.map((item) => item.name);
   }
@@ -318,11 +319,11 @@ function KeysPage() {
     return () => window.clearTimeout(timer);
   }, [searchText]);
 
-  function resetDraft(name = "", models = ["gpt-5.5"]) {
+  function resetDraft(name = "", models = ["deepseek-chat"]) {
     setDraft({
       name,
       quota: 100,
-      modelNames: models.length ? models : ["gpt-5.5"]
+      modelNames: models.length ? models : ["deepseek-chat"]
     });
   }
 
@@ -347,7 +348,7 @@ function KeysPage() {
 
   function handleOpenCreator() {
     setEditingId(null);
-    resetDraft(`测试令牌 ${rows.length + 1}`, [availableModels[0] || "gpt-5.5"]);
+    resetDraft(`测试令牌 ${rows.length + 1}`, [availableModels[0] || "deepseek-chat"]);
     setShowEditor(true);
   }
 
@@ -361,7 +362,7 @@ function KeysPage() {
     setDraft({
       name: current.name,
       quota: current.quota,
-      modelNames: current.modelNames.length ? current.modelNames : [availableModels[0] || "gpt-5.5"]
+      modelNames: current.modelNames.length ? current.modelNames : [availableModels[0] || "deepseek-chat"]
     });
     setShowEditor(true);
   }
@@ -377,7 +378,7 @@ function KeysPage() {
 
     const payload = {
       name: draft.name.trim(),
-      group_name: "codex专用分组",
+      group_name: DEFAULT_GROUP,
       model_names: draft.modelNames,
       enabled: true,
       quota: draft.quota,
@@ -388,7 +389,7 @@ function KeysPage() {
       input_token_price: 0,
       output_token_price: 0,
       request_price: 0,
-      remark: "前端联调写入"
+      remark: "frontend integration write"
     };
 
     try {
@@ -442,7 +443,7 @@ function KeysPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: row.name,
-          group_name: "codex专用分组",
+          group_name: DEFAULT_GROUP,
           model_names: row.modelNames,
           enabled: !row.enabled,
           quota: row.quota,
@@ -453,7 +454,7 @@ function KeysPage() {
           input_token_price: 0,
           output_token_price: 0,
           request_price: 0,
-          remark: "状态切换"
+          remark: "status toggle"
         })
       });
       if (!response.ok) {
@@ -505,7 +506,7 @@ function KeysPage() {
 
         <div className="info-banner">
           <KeyRound size={16} />
-          <span>当前页面已接入后端 `/api/models` 和 `/api/keys`，创建、搜索、编辑、删除都会直接落到 SQLite。</span>
+          <span>当前页面已接入 `/api/models` 和 `/api/keys`，并默认使用 `codex-group` 分组匹配 DeepSeek 能力映射。</span>
         </div>
 
         {showEditor ? (

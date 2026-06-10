@@ -3,6 +3,8 @@ package router
 import (
 	"ai-chat-platform/backend/config"
 	"ai-chat-platform/backend/handler"
+	"ai-chat-platform/backend/middleware"
+	"ai-chat-platform/backend/service"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -34,6 +36,10 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 	sessionHandler := handler.SessionHandler{DB: db}
 	messageHandler := handler.MessageHandler{DB: db}
 	usageLogHandler := handler.UsageLogHandler{DB: db}
+	gatewayHandler := handler.GatewayHandler{
+		DB:             db,
+		DeepSeekClient: service.NewDeepSeekClient(cfg.RequestTimeoutSeconds),
+	}
 
 	r.GET("/health", healthHandler.Get)
 
@@ -80,6 +86,13 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		api.GET("/usage-logs", usageLogHandler.List)
 		api.POST("/usage-logs", usageLogHandler.Create)
 		api.DELETE("/usage-logs/:id", usageLogHandler.Delete)
+	}
+
+	v1 := r.Group("/v1")
+	v1.Use(middleware.APIKeyAuth(db))
+	{
+		v1.GET("/models", gatewayHandler.ListModels)
+		v1.POST("/chat/completions", gatewayHandler.ChatCompletions)
 	}
 
 	return r

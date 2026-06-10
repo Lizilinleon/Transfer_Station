@@ -30,6 +30,7 @@
 - 会话 CRUD
 - 消息 CRUD
 - 用量日志 CRUD
+- DeepSeek 网关最小链路
 
 ## 3. 当前数据库设计
 
@@ -70,6 +71,7 @@
 - `rate_limited`
 - `max_requests_minute`
 - `test_model`
+- `api_key` 留空等待真实 DeepSeek Key
 
 ### 3.4 abilities
 
@@ -135,6 +137,25 @@
 - 输入/输出/请求/总成本
 - 状态、错误信息
 - 延迟、客户端 IP、User-Agent
+
+## 4.1 DeepSeek 真实接入准备
+
+当前已按 DeepSeek 方向预留：
+
+- 平台密钥鉴权
+- `/v1/models`
+- `/v1/chat/completions`
+- DeepSeek 默认渠道
+- DeepSeek 默认能力映射
+- 调用后写入 `usage_logs`
+- 按模型价格扣减 `api_keys` 额度
+
+当前需要手动准备：
+
+- 真实 `DEEPSEEK_API_KEY`
+- 可用模型价格配置
+- 是否启用流式输出
+- 是否继续扩展更多 DeepSeek 模型
 
 ## 4. 当前接口范围
 
