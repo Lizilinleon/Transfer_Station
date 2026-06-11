@@ -11,8 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// APIKeyContextKey is where the verified key record is stored in Gin context.
 const APIKeyContextKey = "api_key_record"
 
+// APIKeyAuth validates bearer tokens and blocks disabled, expired, or empty-quota keys.
 func APIKeyAuth(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authorization := c.GetHeader("Authorization")
@@ -37,6 +39,7 @@ func APIKeyAuth(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Load the key record once so downstream handlers can reuse it.
 		var apiKey model.APIKey
 		if err := db.Preload("Model").Where("access_key = ?", accessKey).First(&apiKey).Error; err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
@@ -78,6 +81,7 @@ func APIKeyAuth(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Save the verified record for gateway handlers.
 		c.Set(APIKeyContextKey, apiKey)
 		c.Next()
 	}

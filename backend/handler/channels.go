@@ -9,10 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// ChannelHandler manages upstream provider channel records.
 type ChannelHandler struct {
 	DB *gorm.DB
 }
 
+// channelPayload is the JSON shape accepted by channel create/update endpoints.
 type channelPayload struct {
 	Name              string   `json:"name"`
 	ProviderType      string   `json:"provider_type"`
@@ -34,6 +36,7 @@ type channelPayload struct {
 	Remark            string   `json:"remark"`
 }
 
+// List returns provider channels with optional provider, group, and enabled filters.
 func (h ChannelHandler) List(c *gin.Context) {
 	var items []model.ProviderChannel
 	query := h.DB.Order("priority desc, weight desc, id asc")
@@ -56,6 +59,7 @@ func (h ChannelHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items})
 }
 
+// Get loads one provider channel by path id.
 func (h ChannelHandler) Get(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -76,6 +80,7 @@ func (h ChannelHandler) Get(c *gin.Context) {
 	success(c, item)
 }
 
+// Create validates required upstream settings and inserts a channel.
 func (h ChannelHandler) Create(c *gin.Context) {
 	var payload channelPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -117,6 +122,7 @@ func (h ChannelHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Update replaces editable settings for an existing provider channel.
 func (h ChannelHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -167,6 +173,7 @@ func (h ChannelHandler) Update(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes one provider channel by id.
 func (h ChannelHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

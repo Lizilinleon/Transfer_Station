@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config centralizes runtime settings read from .env or system environment.
 type Config struct {
 	AppName               string
 	AppEnv                string
@@ -25,6 +26,8 @@ type Config struct {
 	DeepSeekChannelName   string
 }
 
+// Load reads optional .env files first, then falls back to process environment
+// and safe local-development defaults.
 func Load() Config {
 	if hasEnvFile(".env") || hasEnvFile("../.env") {
 		if err := godotenv.Load(".env", "../.env"); err != nil {
@@ -50,6 +53,7 @@ func Load() Config {
 	}
 }
 
+// getEnv returns the environment value or a fallback when the key is empty.
 func getEnv(key, fallback string) string {
 	value := os.Getenv(key)
 	if value == "" {
@@ -58,6 +62,7 @@ func getEnv(key, fallback string) string {
 	return value
 }
 
+// getEnvAsInt parses an integer environment value, keeping the fallback on errors.
 func getEnvAsInt(key string, fallback int) int {
 	value := os.Getenv(key)
 	if value == "" {
@@ -71,6 +76,7 @@ func getEnvAsInt(key string, fallback int) int {
 	return parsed
 }
 
+// hasEnvFile checks whether a candidate .env path exists before loading it.
 func hasEnvFile(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

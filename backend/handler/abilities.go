@@ -9,10 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// AbilityHandler manages model-to-channel routing abilities.
 type AbilityHandler struct {
 	DB *gorm.DB
 }
 
+// abilityPayload is the JSON shape accepted by ability create/update endpoints.
 type abilityPayload struct {
 	GroupName string `json:"group_name"`
 	ModelName string `json:"model_name"`
@@ -22,6 +24,7 @@ type abilityPayload struct {
 	Weight    int    `json:"weight"`
 }
 
+// List returns routing abilities with optional group, model, and enabled filters.
 func (h AbilityHandler) List(c *gin.Context) {
 	var items []model.ModelAbility
 	query := h.DB.Preload("Channel").Order("priority desc, weight desc, id asc")
@@ -44,6 +47,7 @@ func (h AbilityHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items})
 }
 
+// Create links a group and model name to a provider channel.
 func (h AbilityHandler) Create(c *gin.Context) {
 	var payload abilityPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -78,6 +82,7 @@ func (h AbilityHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Update replaces routing settings for an existing ability.
 func (h AbilityHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -121,6 +126,7 @@ func (h AbilityHandler) Update(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes one routing ability by id.
 func (h AbilityHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

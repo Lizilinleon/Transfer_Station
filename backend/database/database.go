@@ -15,11 +15,13 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
+// New opens the SQLite database, migrates tables, and prepares default records.
 func New(cfg config.Config) (*gorm.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(cfg.SQLitePath), 0o755); err != nil {
 		return nil, fmt.Errorf("create sqlite directory: %w", err)
 	}
 
+	// Use a quieter GORM logger that still reports slow SQL and warnings.
 	dbLogger := gormlogger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		gormlogger.Config{
@@ -37,6 +39,7 @@ func New(cfg config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
 	}
 
+	// AutoMigrate keeps the local SQLite schema aligned with model definitions.
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.AIModel{},

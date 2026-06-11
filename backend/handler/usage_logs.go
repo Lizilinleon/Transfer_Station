@@ -9,10 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// UsageLogHandler exposes usage records for admin inspection and manual entry.
 type UsageLogHandler struct {
 	DB *gorm.DB
 }
 
+// usageLogPayload is the JSON shape accepted by manual usage-log creation.
 type usageLogPayload struct {
 	APIKeyID         *uint   `json:"api_key_id"`
 	ChannelID        *uint   `json:"channel_id"`
@@ -32,6 +34,7 @@ type usageLogPayload struct {
 	UserAgent        string  `json:"user_agent"`
 }
 
+// List returns usage logs with optional model, status, and API key filters.
 func (h UsageLogHandler) List(c *gin.Context) {
 	var items []model.UsageLog
 	query := h.DB.Preload("APIKey").Preload("Channel").Order("created_at desc, id desc")
@@ -54,6 +57,7 @@ func (h UsageLogHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items})
 }
 
+// Create inserts a usage log record, defaulting status to success when omitted.
 func (h UsageLogHandler) Create(c *gin.Context) {
 	var payload usageLogPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -102,6 +106,7 @@ func (h UsageLogHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes one usage log by id.
 func (h UsageLogHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

@@ -9,10 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// ModelHandler manages AI model records for the admin API.
 type ModelHandler struct {
 	DB *gorm.DB
 }
 
+// modelPayload is the JSON shape accepted by model create/update endpoints.
 type modelPayload struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
@@ -25,6 +27,7 @@ type modelPayload struct {
 	SortOrder   int    `json:"sort_order"`
 }
 
+// List returns models, optionally filtered by enabled status and group.
 func (h ModelHandler) List(c *gin.Context) {
 	var models []model.AIModel
 	query := h.DB.Order("sort_order asc, id asc")
@@ -45,6 +48,7 @@ func (h ModelHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": models})
 }
 
+// Get loads one model by path id.
 func (h ModelHandler) Get(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -65,6 +69,7 @@ func (h ModelHandler) Get(c *gin.Context) {
 	success(c, item)
 }
 
+// Create validates required model fields and inserts a new model record.
 func (h ModelHandler) Create(c *gin.Context) {
 	var payload modelPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -97,6 +102,7 @@ func (h ModelHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Update replaces editable model fields for an existing model.
 func (h ModelHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -138,6 +144,7 @@ func (h ModelHandler) Update(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes one model record by id.
 func (h ModelHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

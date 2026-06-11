@@ -12,11 +12,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// GatewayHandler exposes OpenAI-compatible endpoints and proxies to DeepSeek.
 type GatewayHandler struct {
 	DB             *gorm.DB
 	DeepSeekClient *service.DeepSeekClient
 }
 
+// ChatCompletionRequest is the client request shape accepted by /v1/chat/completions.
 type ChatCompletionRequest struct {
 	Model       string                          `json:"model"`
 	Messages    []service.ChatCompletionMessage `json:"messages"`
@@ -26,6 +28,7 @@ type ChatCompletionRequest struct {
 	Stream      bool                            `json:"stream,omitempty"`
 }
 
+// ListModels returns enabled models visible to the authenticated API key.
 func (h GatewayHandler) ListModels(c *gin.Context) {
 	apiKey := c.MustGet(middleware.APIKeyContextKey).(model.APIKey)
 	models, err := h.collectAvailableModels(apiKey)
@@ -45,6 +48,7 @@ func (h GatewayHandler) ListModels(c *gin.Context) {
 		OwnedBy string `json:"owned_by"`
 	}
 
+	// Convert internal model records into the OpenAI-style list response.
 	items := make([]modelItem, 0, len(models))
 	for _, item := range models {
 		items = append(items, modelItem{
@@ -60,6 +64,7 @@ func (h GatewayHandler) ListModels(c *gin.Context) {
 	})
 }
 
+// ChatCompletions validates the request, resolves a channel, calls upstream, and logs usage.
 func (h GatewayHandler) ChatCompletions(c *gin.Context) {
 	apiKey := c.MustGet(middleware.APIKeyContextKey).(model.APIKey)
 
@@ -84,6 +89,7 @@ func (h GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
+	// Streaming is explicitly rejected until the upstream streaming path is implemented.
 	if payload.Stream {
 		c.JSON(http.StatusNotImplemented, gin.H{
 			"error": gin.H{
@@ -104,6 +110,7 @@ func (h GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
+	// Resolve the best enabled upstream channel for this key group and model.
 	channel, err := h.resolveChannel(apiKey.GroupName, payload.Model)
 	if err != nil {
 		message := err.Error()
@@ -119,6 +126,7 @@ func (h GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
+	// Measure upstream latency so usage logs can show request performance.
 	startedAt := time.Now()
 	upstreamResponse, err := h.DeepSeekClient.ChatCompletions(c.Request.Context(), channel, service.ChatCompletionRequest{
 		Model:       payload.Model,
@@ -140,6 +148,7 @@ func (h GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
+	// Calculate quota cost before persisting usage or returning the response.
 	totalCost := h.calculateCost(payload.Model, upstreamResponse.Usage)
 	if !apiKey.UnlimitedQuota && apiKey.RemainingQuota < totalCost {
 		c.JSON(http.StatusPaymentRequired, gin.H{
@@ -164,6 +173,7 @@ func (h GatewayHandler) ChatCompletions(c *gin.Context) {
 	c.JSON(http.StatusOK, upstreamResponse)
 }
 
+// collectAvailableModels loads enabled models for the key group and key restrictions.
 func (h GatewayHandler) collectAvailableModels(apiKey model.APIKey) ([]model.AIModel, error) {
 	var items []model.AIModel
 	query := h.DB.Where("enabled = ? AND group_name = ?", true, apiKey.GroupName).Order("sort_order asc, id asc")
@@ -178,6 +188,7 @@ func (h GatewayHandler) collectAvailableModels(apiKey model.APIKey) ([]model.AIM
 	return items, nil
 }
 
+// modelAllowed checks optional per-key model allowlists.
 func (h GatewayHandler) modelAllowed(apiKey model.APIKey, modelName string) bool {
 	if len(apiKey.ModelNames) == 0 {
 		return true
@@ -190,6 +201,7 @@ func (h GatewayHandler) modelAllowed(apiKey model.APIKey, modelName string) bool
 	return false
 }
 
+// resolveChannel chooses an enabled DeepSeek channel by ability first, then fallback channel list.
 func (h GatewayHandler) resolveChannel(groupName, modelName string) (model.ProviderChannel, error) {
 	var abilities []model.ModelAbility
 	if err := h.DB.Preload("Channel").
@@ -199,6 +211,7 @@ func (h GatewayHandler) resolveChannel(groupName, modelName string) (model.Provi
 		return model.ProviderChannel{}, err
 	}
 
+	// Prefer explicit model abilities because they are the most specific routing rules.
 	for _, ability := range abilities {
 		if ability.Channel != nil && ability.Channel.Enabled && ability.Channel.ProviderType == "deepseek" {
 			return *ability.Channel, nil
@@ -213,6 +226,7 @@ func (h GatewayHandler) resolveChannel(groupName, modelName string) (model.Provi
 		return model.ProviderChannel{}, err
 	}
 
+	// Fall back to enabled group channels that either allow all models or include this model.
 	for _, channel := range channels {
 		if len(channel.ModelNames) == 0 {
 			return channel, nil
@@ -227,6 +241,7 @@ func (h GatewayHandler) resolveChannel(groupName, modelName string) (model.Provi
 	return model.ProviderChannel{}, gorm.ErrRecordNotFound
 }
 
+// calculateCost multiplies token usage by the model pricing configuration.
 func (h GatewayHandler) calculateCost(modelName string, usage service.ChatCompletionUsage) float64 {
 	var selectedModel model.AIModel
 	if err := h.DB.Where("name = ?", modelName).First(&selectedModel).Error; err != nil {
@@ -239,10 +254,12 @@ func (h GatewayHandler) calculateCost(modelName string, usage service.ChatComple
 	return inputCost + outputCost + requestCost
 }
 
+// applyUsage updates key quota and writes a success usage log atomically.
 func (h GatewayHandler) applyUsage(apiKey model.APIKey, channel model.ProviderChannel, modelName string, usage service.ChatCompletionUsage, totalCost float64, latencyMs int, c *gin.Context) error {
 	tx := h.DB.Begin()
 	now := time.Now()
 
+	// Unlimited keys only update last_used_at; limited keys also consume quota.
 	updates := map[string]any{
 		"last_used_at": &now,
 	}
@@ -276,6 +293,7 @@ func (h GatewayHandler) applyUsage(apiKey model.APIKey, channel model.ProviderCh
 	return tx.Commit().Error
 }
 
+// writeUsageLog records failed or non-transactional gateway attempts.
 func (h GatewayHandler) writeUsageLog(apiKey model.APIKey, channel model.ProviderChannel, modelName string, usage service.ChatCompletionUsage, totalCost float64, status, errorMessage string, latencyMs int, c *gin.Context) error {
 	channelID := channel.ID
 	return h.DB.Create(&model.UsageLog{
