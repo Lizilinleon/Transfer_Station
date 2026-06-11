@@ -226,3 +226,27 @@ DELETE /api/usage-logs/:id
 - `stream=true` 先返回预留提示
 - 调用成功后会写入 `usage_logs`
 - 会按 `models` 表中的价格字段计算成本并扣减 `api_keys` 额度
+## 12. Channel Test / 渠道测试
+
+```http
+POST /api/channels/:id/test
+```
+
+用途：
+- 快速验证某个渠道的 `base_url`、`api_key`、`test_model` 是否可用
+- 在不经过客户端 API Key 网关的情况下，直接测试上游渠道
+
+可选请求体：
+
+```json
+{
+  "model": "deepseek-chat",
+  "messages": ["hello from channel test"],
+  "max_tokens": 64
+}
+```
+
+说明：
+- 当前仅支持 `deepseek` 类型渠道
+- 如果不传 `model`，会优先使用渠道自己的 `test_model`
+- 如果不传 `messages`，会发送默认探测消息

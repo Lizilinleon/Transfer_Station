@@ -75,6 +75,27 @@ curl http://localhost:8080/v1/chat/completions \
   }'
 ```
 
+5. 先用渠道测试接口验证上游是否通，再测客户端网关：
+
+```bash
+curl http://localhost:8080/api/channels/1/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": ["hello from channel test"]
+  }'
+```
+
+如果需要，也可以显式指定测试模型：
+
+```bash
+curl http://localhost:8080/api/channels/1/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-chat",
+    "messages": ["hello from channel test"]
+  }'
+```
+
 ## 后续建议按小步开发
 
 1. 流式响应：实现 `stream: true` 的 SSE 转发和流式用量统计。

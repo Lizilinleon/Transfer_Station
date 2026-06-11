@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"encoding/json"
 	"strconv"
+	"time"
 
 	"ai-chat-platform/backend/model"
+	"ai-chat-platform/backend/service"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -11,7 +14,8 @@ import (
 
 // ChannelHandler manages upstream provider channel records.
 type ChannelHandler struct {
-	DB *gorm.DB
+	DB             *gorm.DB
+	DeepSeekClient *service.DeepSeekClient
 }
 
 // channelPayload is the JSON shape accepted by channel create/update endpoints.
@@ -34,6 +38,13 @@ type channelPayload struct {
 	MaxRequestsMinute int      `json:"max_requests_minute"`
 	TestModel         string   `json:"test_model"`
 	Remark            string   `json:"remark"`
+}
+
+type channelTestPayload struct {
+	Model       string   `json:"model"`
+	Messages    []string `json:"messages"`
+	Temperature *float64 `json:"temperature"`
+	MaxTokens   int      `json:"max_tokens"`
 }
 
 // List returns provider channels with optional provider, group, and enabled filters.
@@ -187,4 +198,106 @@ func (h ChannelHandler) Delete(c *gin.Context) {
 	}
 
 	success(c, gin.H{"deleted": true})
+}
+
+// Test sends a lightweight chat request through the selected channel to verify upstream connectivity.
+func (h ChannelHandler) Test(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		fail(c, 400, "invalid channel id")
+		return
+	}
+
+	if h.DeepSeekClient == nil {
+		fail(c, 500, "channel test client is not configured")
+		return
+	}
+
+	var item model.ProviderChannel
+	if err := h.DB.First(&item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			fail(c, 404, "channel not found")
+			return
+		}
+		fail(c, 500, "failed to load channel")
+		return
+	}
+
+	if item.ProviderType != "deepseek" {
+		fail(c, 400, "channel test currently supports deepseek only")
+		return
+	}
+
+	var payload channelTestPayload
+	if err := c.ShouldBindJSON(&payload); err != nil && err.Error() != "EOF" {
+		fail(c, 400, "invalid request body")
+		return
+	}
+
+	modelName := payload.Model
+	if modelName == "" {
+		modelName = item.TestModel
+	}
+	if modelName == "" && len(item.ModelNames) > 0 {
+		modelName = item.ModelNames[0]
+	}
+	if modelName == "" {
+		fail(c, 400, "channel test model is required")
+		return
+	}
+
+	rawMessages, err := buildChannelTestMessages(payload.Messages)
+	if err != nil {
+		fail(c, 400, "invalid test messages")
+		return
+	}
+	if len(rawMessages) == 0 {
+		rawMessages = []service.ChatCompletionMessage{
+			{
+				Role:    "user",
+				Content: json.RawMessage(`"Ping from channel test. Reply briefly with OK."`),
+			},
+		}
+	}
+
+	startedAt := time.Now()
+	response, err := h.DeepSeekClient.ChatCompletions(c.Request.Context(), item, service.ChatCompletionRequest{
+		Model:       modelName,
+		Messages:    rawMessages,
+		Temperature: payload.Temperature,
+		MaxTokens:   payload.MaxTokens,
+		Stream:      false,
+	})
+	latencyMs := int(time.Since(startedAt).Milliseconds())
+	if err != nil {
+		fail(c, 502, err.Error())
+		return
+	}
+
+	success(c, gin.H{
+		"channel_id":    item.ID,
+		"channel_name":  item.Name,
+		"provider_type": item.ProviderType,
+		"model":         modelName,
+		"latency_ms":    latencyMs,
+		"response":      response,
+	})
+}
+
+func buildChannelTestMessages(messages []string) ([]service.ChatCompletionMessage, error) {
+	items := make([]service.ChatCompletionMessage, 0, len(messages))
+	for _, item := range messages {
+		if item == "" {
+			continue
+		}
+		content, err := json.Marshal(item)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, service.ChatCompletionMessage{
+			Role:    "user",
+			Content: content,
+		})
+	}
+	return items, nil
 }

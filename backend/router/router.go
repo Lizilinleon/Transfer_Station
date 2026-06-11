@@ -31,7 +31,10 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 
 	healthHandler := handler.HealthHandler{Config: cfg}
 	modelHandler := handler.ModelHandler{DB: db}
-	channelHandler := handler.ChannelHandler{DB: db}
+	channelHandler := handler.ChannelHandler{
+		DB:             db,
+		DeepSeekClient: service.NewDeepSeekClient(cfg.RequestTimeoutSeconds),
+	}
 	abilityHandler := handler.AbilityHandler{DB: db}
 	keyHandler := handler.KeyHandler{DB: db}
 	optionHandler := handler.OptionHandler{DB: db}
@@ -58,6 +61,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		api.GET("/channels/:id", channelHandler.Get)
 		api.POST("/channels", channelHandler.Create)
 		api.PUT("/channels/:id", channelHandler.Update)
+		api.POST("/channels/:id/test", channelHandler.Test)
 		api.DELETE("/channels/:id", channelHandler.Delete)
 
 		api.GET("/abilities", abilityHandler.List)
