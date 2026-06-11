@@ -1,0 +1,10 @@
+{
+  "name": "ai-chat-backend-runner",
+  "private": true,
+  "scripts": {
+    ".": "go run .",
+    "dev": "go run .",
+    "start": "go run .",
+    "test": "go test ./..."
+  }
+}

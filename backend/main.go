@@ -8,6 +8,7 @@ import (
 	"ai-chat-platform/backend/router"
 )
 
+// main wires together configuration, database initialization, routes, and startup.
 func main() {
 	cfg := config.Load()
 

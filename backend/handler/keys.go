@@ -11,10 +11,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// KeyHandler manages client API keys and their quota settings.
 type KeyHandler struct {
 	DB *gorm.DB
 }
 
+// keyPayload is the JSON shape accepted by key create/update endpoints.
 type keyPayload struct {
 	Name             string   `json:"name"`
 	GroupName        string   `json:"group_name"`
@@ -33,6 +35,7 @@ type keyPayload struct {
 	ExpiresAt        string   `json:"expires_at"`
 }
 
+// List returns API keys with optional status, group, model, and keyword filters.
 func (h KeyHandler) List(c *gin.Context) {
 	var items []model.APIKey
 	query := h.DB.Preload("Model").Order("id desc")
@@ -63,6 +66,7 @@ func (h KeyHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items})
 }
 
+// Get loads one API key by path id.
 func (h KeyHandler) Get(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -83,6 +87,7 @@ func (h KeyHandler) Get(c *gin.Context) {
 	success(c, item)
 }
 
+// Create generates a new access key and stores its quota/model restrictions.
 func (h KeyHandler) Create(c *gin.Context) {
 	var payload keyPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -136,6 +141,7 @@ func (h KeyHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Update replaces editable key metadata, quota, model restrictions, and expiry.
 func (h KeyHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -198,6 +204,7 @@ func (h KeyHandler) Update(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes one API key by id.
 func (h KeyHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -213,6 +220,7 @@ func (h KeyHandler) Delete(c *gin.Context) {
 	success(c, gin.H{"deleted": true})
 }
 
+// normalizeEnabled defaults missing enabled values to true.
 func normalizeEnabled(input *bool) bool {
 	if input == nil {
 		return true
@@ -220,6 +228,7 @@ func normalizeEnabled(input *bool) bool {
 	return *input
 }
 
+// normalizeBillingRule keeps the current placeholder billing rule when omitted.
 func normalizeBillingRule(input string) string {
 	if input == "" {
 		return "reserved"
@@ -227,6 +236,7 @@ func normalizeBillingRule(input string) string {
 	return input
 }
 
+// calculateRemainingQuota derives remaining quota and never returns a negative value.
 func calculateRemainingQuota(quota, usedQuota float64, unlimited bool) float64 {
 	if unlimited {
 		return 0

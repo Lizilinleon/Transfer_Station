@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// New configures Gin mode, middleware, handlers, and all HTTP routes.
 func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -19,6 +20,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 	}
 
 	r := gin.New()
+	// Logger and Recovery provide request logs and protect the server from panics.
 	r.Use(gin.Logger(), gin.Recovery())
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{cfg.CorsAllowOrigin},
@@ -43,6 +45,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 
 	r.GET("/health", healthHandler.Get)
 
+	// /api contains management CRUD endpoints for the admin/frontend side.
 	api := r.Group("/api")
 	{
 		api.GET("/models", modelHandler.List)
@@ -88,6 +91,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		api.DELETE("/usage-logs/:id", usageLogHandler.Delete)
 	}
 
+	// /v1 mimics OpenAI-style client endpoints and requires bearer API keys.
 	v1 := r.Group("/v1")
 	v1.Use(middleware.APIKeyAuth(db))
 	{

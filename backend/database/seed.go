@@ -10,8 +10,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// seedDefaults inserts first-run records without overwriting existing data.
 func seedDefaults(db *gorm.DB, cfg config.Config) error {
 	admin := model.User{}
+	// Ensure there is a usable administrator account for local development.
 	if err := db.Where("username = ?", cfg.DefaultAdminUsername).First(&admin).Error; err != nil {
 		if err != gorm.ErrRecordNotFound {
 			return err
@@ -31,6 +33,7 @@ func seedDefaults(db *gorm.DB, cfg config.Config) error {
 	}
 
 	defaultModel := model.AIModel{}
+	// Register the default model shown to clients and used by the gateway.
 	if err := db.Where("name = ?", cfg.DefaultModelName).First(&defaultModel).Error; err != nil {
 		if err != gorm.ErrRecordNotFound {
 			return err
@@ -56,6 +59,7 @@ func seedDefaults(db *gorm.DB, cfg config.Config) error {
 	}
 
 	defaultChannel := model.ProviderChannel{}
+	// Create a DeepSeek channel shell; the real API key still comes from .env.
 	if err := db.Where("name = ?", cfg.DeepSeekChannelName).First(&defaultChannel).Error; err != nil {
 		if err != gorm.ErrRecordNotFound {
 			return err
@@ -82,6 +86,7 @@ func seedDefaults(db *gorm.DB, cfg config.Config) error {
 	}
 
 	defaultAbility := model.ModelAbility{}
+	// Link group + model + channel so routing can resolve an upstream provider.
 	if err := db.Where("group_name = ? AND model_name = ? AND channel_id = ?", cfg.DefaultModelGroup, cfg.DefaultModelName, defaultChannel.ID).First(&defaultAbility).Error; err != nil {
 		if err != gorm.ErrRecordNotFound {
 			return err
@@ -100,6 +105,7 @@ func seedDefaults(db *gorm.DB, cfg config.Config) error {
 		}
 	}
 
+	// Store common settings in the options table for future admin editing.
 	options := []model.SystemOption{
 		{
 			OptionKey:   "site_name",

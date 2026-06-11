@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// User stores a platform account and its default model group.
 type User struct {
 	ID           uint      `json:"id" gorm:"primaryKey"`
 	Username     string    `json:"username" gorm:"size:64;uniqueIndex;not null"`
@@ -14,6 +15,7 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// AIModel describes a model exposed by the platform.
 type AIModel struct {
 	ID              uint      `json:"id" gorm:"primaryKey"`
 	Name            string    `json:"name" gorm:"size:128;uniqueIndex;not null"`
@@ -37,6 +39,7 @@ type AIModel struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+// ProviderChannel stores one upstream provider configuration.
 type ProviderChannel struct {
 	ID                uint      `json:"id" gorm:"primaryKey"`
 	Name              string    `json:"name" gorm:"size:128;not null"`
@@ -61,6 +64,7 @@ type ProviderChannel struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
+// ModelAbility maps a group and model to a usable provider channel.
 type ModelAbility struct {
 	ID        uint             `json:"id" gorm:"primaryKey"`
 	GroupName string           `json:"group_name" gorm:"size:128;index;not null"`
@@ -74,6 +78,7 @@ type ModelAbility struct {
 	UpdatedAt time.Time        `json:"updated_at"`
 }
 
+// APIKey represents a client credential plus model and quota limits.
 type APIKey struct {
 	ID               uint       `json:"id" gorm:"primaryKey"`
 	Name             string     `json:"name" gorm:"size:128;not null"`
@@ -99,6 +104,7 @@ type APIKey struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
+// UsageLog records one gateway request, token usage, cost, and status.
 type UsageLog struct {
 	ID               uint             `json:"id" gorm:"primaryKey"`
 	APIKeyID         *uint            `json:"api_key_id" gorm:"index"`
@@ -123,6 +129,7 @@ type UsageLog struct {
 	UpdatedAt        time.Time        `json:"updated_at"`
 }
 
+// SystemOption stores editable key-value settings.
 type SystemOption struct {
 	ID          uint      `json:"id" gorm:"primaryKey"`
 	OptionKey   string    `json:"option_key" gorm:"size:128;uniqueIndex;not null"`
@@ -133,6 +140,7 @@ type SystemOption struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// ChatSession stores conversation-level metadata.
 type ChatSession struct {
 	ID            uint       `json:"id" gorm:"primaryKey"`
 	Title         string     `json:"title" gorm:"size:255;not null"`
@@ -149,6 +157,7 @@ type ChatSession struct {
 	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
+// ChatMessage stores one message inside a chat session.
 type ChatMessage struct {
 	ID             uint      `json:"id" gorm:"primaryKey"`
 	SessionID      uint      `json:"session_id" gorm:"index;not null"`
