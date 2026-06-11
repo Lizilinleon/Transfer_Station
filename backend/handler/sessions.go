@@ -10,10 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// SessionHandler manages chat session metadata.
 type SessionHandler struct {
 	DB *gorm.DB
 }
 
+// sessionPayload is the JSON shape accepted by session create/update endpoints.
 type sessionPayload struct {
 	Title        string  `json:"title"`
 	SystemPrompt string  `json:"system_prompt"`
@@ -25,6 +27,7 @@ type sessionPayload struct {
 	MaxTokens    int     `json:"max_tokens"`
 }
 
+// List returns chat sessions, optionally filtered by model name.
 func (h SessionHandler) List(c *gin.Context) {
 	var items []model.ChatSession
 	query := h.DB.Order("updated_at desc, id desc")
@@ -41,6 +44,7 @@ func (h SessionHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items})
 }
 
+// Get loads one chat session by path id.
 func (h SessionHandler) Get(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -61,6 +65,7 @@ func (h SessionHandler) Get(c *gin.Context) {
 	success(c, item)
 }
 
+// Create validates a title and inserts a new chat session.
 func (h SessionHandler) Create(c *gin.Context) {
 	var payload sessionPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -92,6 +97,7 @@ func (h SessionHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Update replaces editable session metadata.
 func (h SessionHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -132,6 +138,7 @@ func (h SessionHandler) Update(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes a session and its messages in one transaction.
 func (h SessionHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -155,10 +162,12 @@ func (h SessionHandler) Delete(c *gin.Context) {
 	success(c, gin.H{"deleted": true})
 }
 
+// MessageHandler manages messages that belong to chat sessions.
 type MessageHandler struct {
 	DB *gorm.DB
 }
 
+// messagePayload is the JSON shape accepted by message create endpoints.
 type messagePayload struct {
 	Role           string `json:"role"`
 	Content        string `json:"content"`
@@ -168,6 +177,7 @@ type messagePayload struct {
 	ResponseTimeMs int    `json:"response_time_ms"`
 }
 
+// List returns messages for one session in insertion order.
 func (h MessageHandler) List(c *gin.Context) {
 	sessionID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -184,6 +194,7 @@ func (h MessageHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items})
 }
 
+// Create inserts a message and updates the parent session counters.
 func (h MessageHandler) Create(c *gin.Context) {
 	sessionID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -217,6 +228,7 @@ func (h MessageHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Keep lightweight session metadata in sync with message creation.
 	now := time.Now()
 	if err := h.DB.Model(&model.ChatSession{}).
 		Where("id = ?", sessionID).
@@ -231,6 +243,7 @@ func (h MessageHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes one message by id.
 func (h MessageHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

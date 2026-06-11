@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// User stores a platform account and its default model group.
 type User struct {
 	ID           uint      `json:"id" gorm:"primaryKey"`
 	Username     string    `json:"username" gorm:"size:64;uniqueIndex;not null"`
@@ -14,6 +15,7 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// AIModel describes a model exposed by the platform.
 type AIModel struct {
 	ID              uint      `json:"id" gorm:"primaryKey"`
 	Name            string    `json:"name" gorm:"size:128;uniqueIndex;not null"`
@@ -37,30 +39,34 @@ type AIModel struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+// ProviderChannel stores one upstream provider configuration.
 type ProviderChannel struct {
-	ID                uint      `json:"id" gorm:"primaryKey"`
-	Name              string    `json:"name" gorm:"size:128;not null"`
-	ProviderType      string    `json:"provider_type" gorm:"size:128;not null"`
-	BaseURL           string    `json:"base_url" gorm:"size:255;not null"`
-	APIKey            string    `json:"api_key" gorm:"size:255"`
-	Organization      string    `json:"organization" gorm:"size:128"`
-	GroupName         string    `json:"group_name" gorm:"size:128;not null"`
-	ModelNames        []string  `json:"model_names" gorm:"serializer:json"`
-	ModelMapping      string    `json:"model_mapping" gorm:"type:text"`
-	ExtraHeaders      string    `json:"extra_headers" gorm:"type:text"`
-	RequestTemplate   string    `json:"request_template" gorm:"type:text"`
-	ResponseTemplate  string    `json:"response_template" gorm:"type:text"`
-	Weight            int       `json:"weight" gorm:"not null;default:0"`
-	Priority          int       `json:"priority" gorm:"not null;default:0"`
-	Enabled           bool      `json:"enabled" gorm:"not null;default:true"`
-	RateLimited       bool      `json:"rate_limited" gorm:"not null;default:false"`
-	MaxRequestsMinute int       `json:"max_requests_minute" gorm:"not null;default:0"`
-	TestModel         string    `json:"test_model" gorm:"size:128"`
-	Remark            string    `json:"remark" gorm:"size:500"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                uint       `json:"id" gorm:"primaryKey"`
+	Name              string     `json:"name" gorm:"size:128;not null"`
+	ProviderType      string     `json:"provider_type" gorm:"size:128;not null"`
+	BaseURL           string     `json:"base_url" gorm:"size:255;not null"`
+	APIKey            string     `json:"api_key" gorm:"size:255"`
+	Organization      string     `json:"organization" gorm:"size:128"`
+	GroupName         string     `json:"group_name" gorm:"size:128;not null"`
+	ModelNames        []string   `json:"model_names" gorm:"serializer:json"`
+	ModelMapping      string     `json:"model_mapping" gorm:"type:text"`
+	ExtraHeaders      string     `json:"extra_headers" gorm:"type:text"`
+	RequestTemplate   string     `json:"request_template" gorm:"type:text"`
+	ResponseTemplate  string     `json:"response_template" gorm:"type:text"`
+	Weight            int        `json:"weight" gorm:"not null;default:0"`
+	Priority          int        `json:"priority" gorm:"not null;default:0"`
+	Enabled           bool       `json:"enabled" gorm:"not null;default:true"`
+	RateLimited       bool       `json:"rate_limited" gorm:"not null;default:false"`
+	MaxRequestsMinute int        `json:"max_requests_minute" gorm:"not null;default:0"`
+	TestModel         string     `json:"test_model" gorm:"size:128"`
+	UsedQuota         float64    `json:"used_quota" gorm:"not null;default:0"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	Remark            string     `json:"remark" gorm:"size:500"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
+// ModelAbility maps a group and model to a usable provider channel.
 type ModelAbility struct {
 	ID        uint             `json:"id" gorm:"primaryKey"`
 	GroupName string           `json:"group_name" gorm:"size:128;index;not null"`
@@ -74,6 +80,7 @@ type ModelAbility struct {
 	UpdatedAt time.Time        `json:"updated_at"`
 }
 
+// APIKey represents a client credential plus model and quota limits.
 type APIKey struct {
 	ID               uint       `json:"id" gorm:"primaryKey"`
 	Name             string     `json:"name" gorm:"size:128;not null"`
@@ -99,6 +106,7 @@ type APIKey struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
+// UsageLog records one gateway request, token usage, cost, and status.
 type UsageLog struct {
 	ID               uint             `json:"id" gorm:"primaryKey"`
 	APIKeyID         *uint            `json:"api_key_id" gorm:"index"`
@@ -123,6 +131,7 @@ type UsageLog struct {
 	UpdatedAt        time.Time        `json:"updated_at"`
 }
 
+// SystemOption stores editable key-value settings.
 type SystemOption struct {
 	ID          uint      `json:"id" gorm:"primaryKey"`
 	OptionKey   string    `json:"option_key" gorm:"size:128;uniqueIndex;not null"`
@@ -133,6 +142,7 @@ type SystemOption struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// ChatSession stores conversation-level metadata.
 type ChatSession struct {
 	ID            uint       `json:"id" gorm:"primaryKey"`
 	Title         string     `json:"title" gorm:"size:255;not null"`
@@ -149,6 +159,7 @@ type ChatSession struct {
 	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
+// ChatMessage stores one message inside a chat session.
 type ChatMessage struct {
 	ID             uint      `json:"id" gorm:"primaryKey"`
 	SessionID      uint      `json:"session_id" gorm:"index;not null"`

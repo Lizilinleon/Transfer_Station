@@ -7,6 +7,7 @@ import (
 
 const keyChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+// GenerateAccessKey creates a client-facing key with an sk- prefix.
 func GenerateAccessKey() string {
 	key, err := generateRandomCharsKey(48)
 	if err != nil {
@@ -15,6 +16,7 @@ func GenerateAccessKey() string {
 	return "sk-" + key
 }
 
+// generateRandomCharsKey uses crypto/rand so generated keys are hard to guess.
 func generateRandomCharsKey(length int) (string, error) {
 	chars := make([]byte, length)
 	maxIndex := big.NewInt(int64(len(keyChars)))

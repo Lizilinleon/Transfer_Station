@@ -1,4 +1,4 @@
-import React, { startTransition, useEffect, useState } from "react";
+import React, { startTransition, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BookOpen,
@@ -25,18 +25,58 @@ import {
 } from "lucide-react";
 import "./styles/app.css";
 
-const API_BASE = "http://localhost:8080";
-const DEFAULT_GROUP = "codex-group";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+const DEFAULT_GROUP = import.meta.env.VITE_DEFAULT_GROUP || "codex-group";
 
 const navItems = [
-  { label: "秘钥管理", path: "/app/keys", active: true },
+  { label: "密钥管理", path: "/app/keys" },
   { label: "体验中心", path: "/app/experience/chat" },
   { label: "模型服务", path: "/app/models" },
   { label: "文档", path: "/app/docs" },
   { label: "用户中心", path: "/app/user" }
 ];
 
-function TopNav() {
+const reservedFeatures = [
+  { title: "对话体验", path: "/app/experience/chat", icon: MessageSquare, note: "预留聊天窗口和会话记录入口" },
+  { title: "模型服务", path: "/app/models", icon: Database, note: "预留模型管理、价格、上下文配置" },
+  { title: "渠道管理", path: "/app/channels", icon: Settings, note: "预留 DeepSeek / OpenAI 等渠道配置" },
+  { title: "能力映射", path: "/app/abilities", icon: Sparkles, note: "预留模型到渠道的路由规则" },
+  { title: "用量日志", path: "/app/usage-logs", icon: CircleDollarSign, note: "预留请求日志、额度和消耗统计" }
+];
+
+function apiUrl(path) {
+  return `${API_BASE}${path}`;
+}
+
+async function requestJSON(path, options = {}) {
+  const response = await fetch(apiUrl(path), {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  const result = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(result?.message || result?.error?.message || `request failed: ${response.status}`);
+  }
+
+  return result;
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "-";
+  }
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
+
+function isPathActive(currentPath, itemPath) {
+  if (itemPath === "/app/keys") {
+    return currentPath === "/" || currentPath === "/app" || currentPath.startsWith("/app/keys");
+  }
+  return currentPath.startsWith(itemPath);
+}
+
+function TopNav({ currentPath }) {
   return (
     <header className="top-nav">
       <div className="brand">
@@ -45,18 +85,31 @@ function TopNav() {
       </div>
       <nav className="nav-links">
         {navItems.map((item) => (
-          <a className={item.active ? "active" : ""} href={item.path} key={item.label}>
+          <a className={isPathActive(currentPath, item.path) ? "active" : ""} href={item.path} key={item.label}>
             {item.label}
           </a>
         ))}
       </nav>
       <div className="nav-actions">
-        <button className="ghost-btn"><BookOpen size={18} /> 新手教程</button>
-        <button className="ghost-btn"><Share2 size={18} /> 推广</button>
-        <a className="recharge-btn" href="/app/recharge"><Wallet size={18} /> 充值</a>
-        <button className="icon-btn" aria-label="消息"><MessageSquare size={18} /></button>
-        <button className="icon-btn" aria-label="设置"><Settings size={18} /></button>
-        <div className="user-chip"><span>测试用户</span><ChevronDown size={16} /></div>
+        <button className="ghost-btn" type="button">
+          <BookOpen size={18} /> 新手教程
+        </button>
+        <button className="ghost-btn" type="button">
+          <Share2 size={18} /> 推广
+        </button>
+        <a className="recharge-btn" href="/app/recharge">
+          <Wallet size={18} /> 充值
+        </a>
+        <button className="icon-btn" aria-label="消息" type="button">
+          <MessageSquare size={18} />
+        </button>
+        <button className="icon-btn" aria-label="设置" type="button">
+          <Settings size={18} />
+        </button>
+        <div className="user-chip">
+          <span>测试用户</span>
+          <ChevronDown size={16} />
+        </div>
       </div>
     </header>
   );
@@ -65,14 +118,18 @@ function TopNav() {
 function AnnouncementBar() {
   return (
     <div className="announcement">
-      <span className="announce-icon"><Megaphone size={16} /></span>
+      <span className="announce-icon">
+        <Megaphone size={16} />
+      </span>
       <strong>公告</strong>
-      <span className="announce-text">当前已预留 DeepSeek 真正接入所需的渠道、能力映射和平台密钥结构。</span>
+      <span className="announce-text">
+        当前先完成前后端联通：密钥管理读取 `/api/models` 和 `/api/keys`，其他模块先放置入口。
+      </span>
     </div>
   );
 }
 
-function SideBar() {
+function SideBar({ currentPath }) {
   return (
     <aside className="page-sidebar">
       <div className="sidebar-company">
@@ -81,22 +138,64 @@ function SideBar() {
         </div>
         <div>
           <h2>示例团队</h2>
-          <p>成员</p>
+          <p>开发环境</p>
         </div>
       </div>
 
-      <button className="sidebar-menu active">
+      <div className="sidebar-section-title">当前功能</div>
+      <a className={isPathActive(currentPath, "/app/keys") ? "sidebar-menu active" : "sidebar-menu"} href="/app/keys">
         <span className="sidebar-menu-icon">
           <KeyRound size={19} />
         </span>
-        <span>令牌管理</span>
-      </button>
+        <span>密钥管理</span>
+        <em className="sidebar-status">已接入</em>
+      </a>
 
-      <button className="sidebar-collapse">
+      <div className="sidebar-section-title">功能预留</div>
+      {reservedFeatures.slice(1).map((item) => {
+        const Icon = item.icon;
+        return (
+          <a
+            className={isPathActive(currentPath, item.path) ? "sidebar-menu sidebar-menu-muted active" : "sidebar-menu sidebar-menu-muted"}
+            href={item.path}
+            key={item.path}
+          >
+            <span className="sidebar-menu-icon sidebar-menu-icon-muted">
+              <Icon size={18} />
+            </span>
+            <span>{item.title}</span>
+            <em className="sidebar-status">预留</em>
+          </a>
+        );
+      })}
+
+      <button className="sidebar-collapse" type="button">
         <ChevronDown size={18} />
         <span>收起</span>
       </button>
     </aside>
+  );
+}
+
+function BackendStatus({ status, info, errorMessage }) {
+  const labelMap = {
+    checking: "连接中",
+    online: "已连接",
+    offline: "未连接"
+  };
+
+  return (
+    <div className="backend-strip">
+      <div>
+        <span className={`backend-chip ${status}`}>{labelMap[status]}</span>
+        <strong>后端服务</strong>
+      </div>
+      <p>
+        {status === "online"
+          ? `${info?.app_name || "AI Smart Chat Platform"} · ${info?.env || "development"} · ${API_BASE}`
+          : errorMessage || `请先启动 Go 服务：${API_BASE}`}
+      </p>
+    </div>
   );
 }
 
@@ -126,7 +225,7 @@ function KeyEditor({ draft, title, availableModels, onChange, onToggleModel, onS
       <div className="editor-head">
         <div>
           <h3>{title}</h3>
-          <p>保存后会直接写入 SQLite，并可用于后续 DeepSeek 平台密钥调用。</p>
+          <p>保存后会直接写入后端 SQLite，后续 `/v1/chat/completions` 可使用这里生成的密钥。</p>
         </div>
         <button className="table-icon-btn" onClick={onCancel} type="button" aria-label="关闭编辑面板">
           <X size={18} />
@@ -135,11 +234,11 @@ function KeyEditor({ draft, title, availableModels, onChange, onToggleModel, onS
 
       <div className="editor-grid">
         <label>
-          <span>令牌名称</span>
+          <span>密钥名称</span>
           <input value={draft.name} onChange={(event) => onChange("name", event.target.value)} />
         </label>
         <label>
-          <span>额度</span>
+          <span>总额度</span>
           <input
             type="number"
             min="0"
@@ -158,10 +257,12 @@ function KeyEditor({ draft, title, availableModels, onChange, onToggleModel, onS
       </div>
 
       <div className="editor-actions">
-        <button className="outline-action" onClick={onCancel} type="button">取消</button>
+        <button className="outline-action" onClick={onCancel} type="button">
+          取消
+        </button>
         <button className="create-solid-btn" onClick={onSubmit} type="button">
           <Plus size={18} />
-          保存令牌
+          保存密钥
         </button>
       </div>
     </section>
@@ -173,8 +274,8 @@ function KeyTable({ rows, onToggleEnabled, onDelete, onEdit, onOpenModelPicker }
     return (
       <section className="token-table-card empty-state">
         <div className="empty-copy">
-          <h3>暂无令牌</h3>
-          <p>数据库里还没有数据，可以直接点击创建令牌写入后端。</p>
+          <h3>暂无密钥</h3>
+          <p>后端数据库里还没有密钥，可以点击“创建密钥”写入第一条数据。</p>
         </div>
       </section>
     );
@@ -184,10 +285,10 @@ function KeyTable({ rows, onToggleEnabled, onDelete, onEdit, onOpenModelPicker }
     <section className="token-table-card">
       <div className="token-table-head">
         <span>名称</span>
-        <span>令牌密钥</span>
+        <span>密钥</span>
         <span>可用模型</span>
         <span>状态</span>
-        <span>已用额度</span>
+        <span>额度</span>
         <span>创建时间</span>
         <span>操作</span>
       </div>
@@ -197,10 +298,12 @@ function KeyTable({ rows, onToggleEnabled, onDelete, onEdit, onOpenModelPicker }
           <span className="token-name">{row.name}</span>
           <div className="token-secret-wrap">
             <span className="token-secret">{row.value}</span>
-            <button className="table-icon-btn" aria-label="查看令牌"><Eye size={16} /></button>
+            <button className="table-icon-btn" aria-label="查看密钥" type="button">
+              <Eye size={16} />
+            </button>
             <button
               className="table-icon-btn"
-              aria-label="复制令牌"
+              aria-label="复制密钥"
               onClick={() => navigator.clipboard?.writeText(row.value)}
               type="button"
             >
@@ -215,8 +318,8 @@ function KeyTable({ rows, onToggleEnabled, onDelete, onEdit, onOpenModelPicker }
             {row.enabled ? "已启用" : "已禁用"}
           </span>
           <span className="token-quota">
-            ¥{row.usedQuota.toFixed(2)}
-            <small>/ 总额度 {row.quota}</small>
+            已用 {row.usedQuota.toFixed(2)}
+            <small>剩余 {row.remainingQuota.toFixed(2)} / 总额 {row.quota}</small>
           </span>
           <span className="token-date">{row.createdAt}</span>
           <div className="row-actions">
@@ -235,13 +338,36 @@ function KeyTable({ rows, onToggleEnabled, onDelete, onEdit, onOpenModelPicker }
       ))}
 
       <div className="token-table-footer">
-        <span>显示第 1 条-第 {rows.length} 条，共 {rows.length} 条</span>
+        <span>
+          显示第 1 条 - 第 {rows.length} 条，共 {rows.length} 条
+        </span>
         <div className="pagination">
-          <button className="page-arrow" aria-label="上一页" type="button">‹</button>
+          <button className="page-arrow" aria-label="上一页" type="button">
+            ‹
+          </button>
           <span className="page-number active">1</span>
-          <button className="page-arrow" aria-label="下一页" type="button">›</button>
+          <button className="page-arrow" aria-label="下一页" type="button">
+            ›
+          </button>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ReservedFeatureGrid() {
+  return (
+    <section className="reserved-grid">
+      {reservedFeatures.map((feature) => {
+        const Icon = feature.icon;
+        return (
+          <a className="reserved-card" href={feature.path} key={feature.path}>
+            <Icon size={22} />
+            <strong>{feature.title}</strong>
+            <span>{feature.note}</span>
+          </a>
+        );
+      })}
     </section>
   );
 }
@@ -251,22 +377,28 @@ function mapKeyItem(item) {
     id: item.id,
     name: item.name,
     value: item.access_key,
+    groupName: item.group_name || DEFAULT_GROUP,
     modelNames: item.model_names || [],
     enabled: item.enabled,
     quota: item.quota || 0,
     usedQuota: item.used_quota || 0,
-    createdAt: item.created_at ? new Date(item.created_at).toLocaleString("zh-CN", { hour12: false }) : "-",
-    billingRule: item.billing_rule || "reserved"
+    remainingQuota: item.remaining_quota || 0,
+    unlimitedQuota: item.unlimited_quota || false,
+    createdAt: formatDate(item.created_at),
+    billingRule: item.billing_rule || "reserved",
+    remark: item.remark || ""
   };
 }
 
-function KeysPage() {
+function KeysPage({ currentPath }) {
   const [rows, setRows] = useState([]);
   const [availableModels, setAvailableModels] = useState(["deepseek-chat"]);
   const [searchText, setSearchText] = useState("");
   const [showEditor, setShowEditor] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [backendStatus, setBackendStatus] = useState("checking");
+  const [backendInfo, setBackendInfo] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [draft, setDraft] = useState({
     name: "",
@@ -274,9 +406,16 @@ function KeysPage() {
     modelNames: ["deepseek-chat"]
   });
 
+  const selectedModelFallback = useMemo(() => [availableModels[0] || "deepseek-chat"], [availableModels]);
+
+  async function fetchHealth() {
+    const result = await requestJSON("/health");
+    setBackendInfo(result?.data || null);
+    setBackendStatus("online");
+  }
+
   async function fetchModels() {
-    const response = await fetch(`${API_BASE}/api/models`);
-    const result = await response.json();
+    const result = await requestJSON("/api/models");
     const items = result?.data?.items || [];
     if (!items.length) {
       return ["deepseek-chat"];
@@ -286,8 +425,7 @@ function KeysPage() {
 
   async function fetchKeys(keyword = "") {
     const query = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
-    const response = await fetch(`${API_BASE}/api/keys${query}`);
-    const result = await response.json();
+    const result = await requestJSON(`/api/keys${query}`);
     return (result?.data?.items || []).map(mapKeyItem);
   }
 
@@ -296,11 +434,13 @@ function KeysPage() {
     setErrorMessage("");
 
     try {
+      await fetchHealth();
       const [models, keys] = await Promise.all([fetchModels(), fetchKeys(keyword)]);
       setAvailableModels(models);
       setRows(keys);
     } catch (error) {
-      setErrorMessage("后端连接失败，请确认 Go 服务已启动。");
+      setBackendStatus("offline");
+      setErrorMessage("后端连接失败，请确认 Go 服务已经启动。");
       console.error(error);
     } finally {
       setLoading(false);
@@ -319,7 +459,7 @@ function KeysPage() {
     return () => window.clearTimeout(timer);
   }, [searchText]);
 
-  function resetDraft(name = "", models = ["deepseek-chat"]) {
+  function resetDraft(name = "", models = selectedModelFallback) {
     setDraft({
       name,
       quota: 100,
@@ -348,7 +488,7 @@ function KeysPage() {
 
   function handleOpenCreator() {
     setEditingId(null);
-    resetDraft(`测试令牌 ${rows.length + 1}`, [availableModels[0] || "deepseek-chat"]);
+    resetDraft(`测试密钥 ${rows.length + 1}`, selectedModelFallback);
     setShowEditor(true);
   }
 
@@ -362,7 +502,7 @@ function KeysPage() {
     setDraft({
       name: current.name,
       quota: current.quota,
-      modelNames: current.modelNames.length ? current.modelNames : [availableModels[0] || "deepseek-chat"]
+      modelNames: current.modelNames.length ? current.modelNames : selectedModelFallback
     });
     setShowEditor(true);
   }
@@ -371,51 +511,42 @@ function KeysPage() {
     handleEdit(id);
   }
 
-  async function handleSaveDraft() {
-    if (!draft.name.trim()) {
-      return;
-    }
-
-    const payload = {
+  function buildKeyPayload(currentRow = null, enabled = true) {
+    return {
       name: draft.name.trim(),
-      group_name: DEFAULT_GROUP,
+      group_name: currentRow?.groupName || DEFAULT_GROUP,
       model_names: draft.modelNames,
-      enabled: true,
+      enabled,
       quota: draft.quota,
-      used_quota: 0,
-      unlimited_quota: false,
-      billing_rule: "reserved",
+      used_quota: currentRow?.usedQuota || 0,
+      unlimited_quota: currentRow?.unlimitedQuota || false,
+      billing_rule: currentRow?.billingRule || "reserved",
       billing_config: "",
       input_token_price: 0,
       output_token_price: 0,
       request_price: 0,
-      remark: "frontend integration write"
+      remark: currentRow?.remark || "frontend integration write"
     };
+  }
+
+  async function handleSaveDraft() {
+    if (!draft.name.trim()) {
+      setErrorMessage("请先填写密钥名称。");
+      return;
+    }
 
     try {
       if (editingId !== null) {
         const current = rows.find((row) => row.id === editingId);
-        const response = await fetch(`${API_BASE}/api/keys/${editingId}`, {
+        await requestJSON(`/api/keys/${editingId}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...payload,
-            enabled: current ? current.enabled : true,
-            used_quota: current ? current.usedQuota : 0
-          })
+          body: JSON.stringify(buildKeyPayload(current, current ? current.enabled : true))
         });
-        if (!response.ok) {
-          throw new Error("update key failed");
-        }
       } else {
-        const response = await fetch(`${API_BASE}/api/keys`, {
+        await requestJSON("/api/keys", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(buildKeyPayload(null, true))
         });
-        if (!response.ok) {
-          throw new Error("create key failed");
-        }
       }
 
       startTransition(() => {
@@ -425,7 +556,7 @@ function KeysPage() {
       });
       reloadData(searchText);
     } catch (error) {
-      setErrorMessage("保存令牌失败，请检查后端是否可用。");
+      setErrorMessage("保存密钥失败，请检查后端接口是否可用。");
       console.error(error);
     }
   }
@@ -438,28 +569,24 @@ function KeysPage() {
 
   async function handleToggleEnabled(row) {
     try {
-      const response = await fetch(`${API_BASE}/api/keys/${row.id}`, {
+      await requestJSON(`/api/keys/${row.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: row.name,
-          group_name: DEFAULT_GROUP,
+          group_name: row.groupName || DEFAULT_GROUP,
           model_names: row.modelNames,
           enabled: !row.enabled,
           quota: row.quota,
           used_quota: row.usedQuota,
-          unlimited_quota: false,
+          unlimited_quota: row.unlimitedQuota,
           billing_rule: row.billingRule || "reserved",
           billing_config: "",
           input_token_price: 0,
           output_token_price: 0,
           request_price: 0,
-          remark: "status toggle"
+          remark: row.remark || "status toggle"
         })
       });
-      if (!response.ok) {
-        throw new Error("toggle key failed");
-      }
       reloadData(searchText);
     } catch (error) {
       setErrorMessage("切换状态失败。");
@@ -469,28 +596,23 @@ function KeysPage() {
 
   async function handleDelete(id) {
     try {
-      const response = await fetch(`${API_BASE}/api/keys/${id}`, {
-        method: "DELETE"
-      });
-      if (!response.ok) {
-        throw new Error("delete key failed");
-      }
+      await requestJSON(`/api/keys/${id}`, { method: "DELETE" });
       reloadData(searchText);
     } catch (error) {
-      setErrorMessage("删除令牌失败。");
+      setErrorMessage("删除密钥失败。");
       console.error(error);
     }
   }
 
   return (
     <main className="keys-layout">
-      <SideBar />
+      <SideBar currentPath={currentPath} />
 
       <section className="keys-main">
         <div className="page-title-row">
           <div className="title-left">
-            <h1>令牌管理</h1>
-            <p>管理您创建的 API 令牌</p>
+            <h1>密钥管理</h1>
+            <p>先接通后端数据，后续再逐步补齐模型、渠道、日志等模块。</p>
           </div>
           <div className="title-actions">
             <button className="outline-action" onClick={() => reloadData(searchText)} type="button">
@@ -499,20 +621,24 @@ function KeysPage() {
             </button>
             <button className="create-solid-btn" onClick={handleOpenCreator} type="button">
               <Plus size={18} />
-              创建令牌
+              创建密钥
             </button>
           </div>
         </div>
 
+        <BackendStatus status={backendStatus} info={backendInfo} errorMessage={errorMessage} />
+
         <div className="info-banner">
           <KeyRound size={16} />
-          <span>当前页面已接入 `/api/models` 和 `/api/keys`，并默认使用 `codex-group` 分组匹配 DeepSeek 能力映射。</span>
+          <span>
+            当前页面已接入 `{API_BASE}/api/models`、`{API_BASE}/api/keys`，默认写入分组 `{DEFAULT_GROUP}`。
+          </span>
         </div>
 
         {showEditor ? (
           <KeyEditor
             draft={draft}
-            title={editingId !== null ? "编辑令牌" : "创建令牌"}
+            title={editingId !== null ? "编辑密钥" : "创建密钥"}
             availableModels={availableModels}
             onChange={handleDraftChange}
             onToggleModel={handleToggleDraftModel}
@@ -524,7 +650,7 @@ function KeysPage() {
         <div className="search-inline">
           <Search size={19} />
           <input
-            placeholder="搜索令牌名称、Key 或模型..."
+            placeholder="搜索密钥名称、Key 或分组..."
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
@@ -540,20 +666,37 @@ function KeysPage() {
           onEdit={handleEdit}
           onOpenModelPicker={handleOpenModelPicker}
         />
+
+        <div className="section-heading">
+          <h2>后续功能入口</h2>
+          <p>先把位置留出来，后面按模块逐个接后端接口。</p>
+        </div>
+        <ReservedFeatureGrid />
       </section>
 
-      <button className="float-help" aria-label="联系客服"><Headphones size={34} /><span /></button>
+      <button className="float-help" aria-label="联系客服" type="button">
+        <Headphones size={34} />
+        <span />
+      </button>
     </main>
   );
 }
 
-function PlaceholderPage({ title, icon: Icon }) {
+function PlaceholderPage({ title, icon: Icon, description }) {
   return (
     <main className="placeholder-page">
       <div className="placeholder-card">
         <Icon size={42} />
         <h1>{title}</h1>
-        <p>这里先保留静态占位，后续再逐步接入具体功能。</p>
+        <p>{description}</p>
+        <div className="placeholder-actions">
+          <a className="create-solid-btn" href="/app/keys">
+            返回密钥管理
+          </a>
+          <button className="outline-action" type="button">
+            暂不实现
+          </button>
+        </div>
       </div>
     </main>
   );
@@ -561,30 +704,93 @@ function PlaceholderPage({ title, icon: Icon }) {
 
 function App() {
   const path = window.location.pathname;
-  let page = <KeysPage />;
+  let page = <KeysPage currentPath={path} />;
 
   if (path.includes("/experience/chat")) {
-    page = <PlaceholderPage title="体验中心 · 对话" icon={MessageSquare} />;
+    page = (
+      <PlaceholderPage
+        title="体验中心 · 对话"
+        icon={MessageSquare}
+        description="这里预留聊天窗口、模型选择、会话列表和消息记录，下一步可以接 `/v1/chat/completions`。"
+      />
+    );
   }
   if (path.includes("/experience/image")) {
-    page = <PlaceholderPage title="图片生成" icon={Sparkles} />;
+    page = (
+      <PlaceholderPage
+        title="图片生成"
+        icon={Sparkles}
+        description="这里预留图片生成表单、任务列表和结果展示区。"
+      />
+    );
   }
   if (path.includes("/models")) {
-    page = <PlaceholderPage title="模型服务" icon={Database} />;
+    page = (
+      <PlaceholderPage
+        title="模型服务"
+        icon={Database}
+        description="这里预留模型 CRUD、价格配置、上下文长度和默认模型开关。"
+      />
+    );
+  }
+  if (path.includes("/channels")) {
+    page = (
+      <PlaceholderPage
+        title="渠道管理"
+        icon={Settings}
+        description="这里预留上游渠道、Base URL、API Key、权重和优先级配置。"
+      />
+    );
+  }
+  if (path.includes("/abilities")) {
+    page = (
+      <PlaceholderPage
+        title="能力映射"
+        icon={Sparkles}
+        description="这里预留 group + model 到 channel 的路由规则管理。"
+      />
+    );
+  }
+  if (path.includes("/usage-logs")) {
+    page = (
+      <PlaceholderPage
+        title="用量日志"
+        icon={CircleDollarSign}
+        description="这里预留请求记录、token 消耗、额度扣减和错误统计。"
+      />
+    );
   }
   if (path.includes("/docs")) {
-    page = <PlaceholderPage title="文档中心" icon={BookOpen} />;
+    page = (
+      <PlaceholderPage
+        title="文档中心"
+        icon={BookOpen}
+        description="这里预留接口文档、快速开始和示例请求。"
+      />
+    );
   }
   if (path.includes("/user")) {
-    page = <PlaceholderPage title="用户中心" icon={UserRound} />;
+    page = (
+      <PlaceholderPage
+        title="用户中心"
+        icon={UserRound}
+        description="这里预留用户资料、团队信息和账号设置。"
+      />
+    );
   }
   if (path.includes("/recharge")) {
-    page = <PlaceholderPage title="充值中心" icon={CircleDollarSign} />;
+    page = (
+      <PlaceholderPage
+        title="充值中心"
+        icon={CircleDollarSign}
+        description="这里预留余额、套餐、订单和支付回调状态。"
+      />
+    );
   }
 
   return (
     <div className="app">
-      <TopNav />
+      <TopNav currentPath={path} />
       <AnnouncementBar />
       {page}
     </div>

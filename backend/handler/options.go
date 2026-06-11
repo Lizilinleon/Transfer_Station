@@ -9,10 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// OptionHandler manages editable system key-value options.
 type OptionHandler struct {
 	DB *gorm.DB
 }
 
+// optionPayload is the JSON shape accepted by option create/update endpoints.
 type optionPayload struct {
 	OptionKey   string `json:"option_key"`
 	OptionValue string `json:"option_value"`
@@ -20,6 +22,7 @@ type optionPayload struct {
 	Description string `json:"description"`
 }
 
+// List returns options, optionally filtered by category.
 func (h OptionHandler) List(c *gin.Context) {
 	var items []model.SystemOption
 	query := h.DB.Order("category asc, id asc")
@@ -36,6 +39,7 @@ func (h OptionHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items})
 }
 
+// Create validates and inserts a new system option.
 func (h OptionHandler) Create(c *gin.Context) {
 	var payload optionPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -63,6 +67,7 @@ func (h OptionHandler) Create(c *gin.Context) {
 	success(c, item)
 }
 
+// Update replaces editable fields for an existing system option.
 func (h OptionHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -99,6 +104,7 @@ func (h OptionHandler) Update(c *gin.Context) {
 	success(c, item)
 }
 
+// Delete removes one system option by id.
 func (h OptionHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
