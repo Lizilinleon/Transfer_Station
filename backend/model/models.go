@@ -41,27 +41,29 @@ type AIModel struct {
 
 // ProviderChannel stores one upstream provider configuration.
 type ProviderChannel struct {
-	ID                uint      `json:"id" gorm:"primaryKey"`
-	Name              string    `json:"name" gorm:"size:128;not null"`
-	ProviderType      string    `json:"provider_type" gorm:"size:128;not null"`
-	BaseURL           string    `json:"base_url" gorm:"size:255;not null"`
-	APIKey            string    `json:"api_key" gorm:"size:255"`
-	Organization      string    `json:"organization" gorm:"size:128"`
-	GroupName         string    `json:"group_name" gorm:"size:128;not null"`
-	ModelNames        []string  `json:"model_names" gorm:"serializer:json"`
-	ModelMapping      string    `json:"model_mapping" gorm:"type:text"`
-	ExtraHeaders      string    `json:"extra_headers" gorm:"type:text"`
-	RequestTemplate   string    `json:"request_template" gorm:"type:text"`
-	ResponseTemplate  string    `json:"response_template" gorm:"type:text"`
-	Weight            int       `json:"weight" gorm:"not null;default:0"`
-	Priority          int       `json:"priority" gorm:"not null;default:0"`
-	Enabled           bool      `json:"enabled" gorm:"not null;default:true"`
-	RateLimited       bool      `json:"rate_limited" gorm:"not null;default:false"`
-	MaxRequestsMinute int       `json:"max_requests_minute" gorm:"not null;default:0"`
-	TestModel         string    `json:"test_model" gorm:"size:128"`
-	Remark            string    `json:"remark" gorm:"size:500"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                uint       `json:"id" gorm:"primaryKey"`
+	Name              string     `json:"name" gorm:"size:128;not null"`
+	ProviderType      string     `json:"provider_type" gorm:"size:128;not null"`
+	BaseURL           string     `json:"base_url" gorm:"size:255;not null"`
+	APIKey            string     `json:"api_key" gorm:"size:255"`
+	Organization      string     `json:"organization" gorm:"size:128"`
+	GroupName         string     `json:"group_name" gorm:"size:128;not null"`
+	ModelNames        []string   `json:"model_names" gorm:"serializer:json"`
+	ModelMapping      string     `json:"model_mapping" gorm:"type:text"`
+	ExtraHeaders      string     `json:"extra_headers" gorm:"type:text"`
+	RequestTemplate   string     `json:"request_template" gorm:"type:text"`
+	ResponseTemplate  string     `json:"response_template" gorm:"type:text"`
+	Weight            int        `json:"weight" gorm:"not null;default:0"`
+	Priority          int        `json:"priority" gorm:"not null;default:0"`
+	Enabled           bool       `json:"enabled" gorm:"not null;default:true"`
+	RateLimited       bool       `json:"rate_limited" gorm:"not null;default:false"`
+	MaxRequestsMinute int        `json:"max_requests_minute" gorm:"not null;default:0"`
+	TestModel         string     `json:"test_model" gorm:"size:128"`
+	UsedQuota         float64    `json:"used_quota" gorm:"not null;default:0"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	Remark            string     `json:"remark" gorm:"size:500"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 // ModelAbility maps a group and model to a usable provider channel.
