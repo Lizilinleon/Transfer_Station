@@ -39,7 +39,7 @@ const navItems = [
 const reservedFeatures = [
   { title: "对话体验", path: "/app/experience/chat", icon: MessageSquare, note: "预留聊天窗口和会话记录入口" },
   { title: "模型服务", path: "/app/models", icon: Database, note: "预留模型管理、价格、上下文配置" },
-  { title: "渠道管理", path: "/app/channels", icon: Settings, note: "预留 DeepSeek / OpenAI 等渠道配置" },
+  { title: "渠道管理", path: "/app/channels", icon: Settings, note: "已接入渠道列表和测试按钮" },
   { title: "能力映射", path: "/app/abilities", icon: Sparkles, note: "预留模型到渠道的路由规则" },
   { title: "用量日志", path: "/app/usage-logs", icon: CircleDollarSign, note: "预留请求日志、额度和消耗统计" }
 ];
@@ -74,6 +74,29 @@ function isPathActive(currentPath, itemPath) {
     return currentPath === "/" || currentPath === "/app" || currentPath.startsWith("/app/keys");
   }
   return currentPath.startsWith(itemPath);
+}
+
+function useBackendStatus() {
+  const [backendStatus, setBackendStatus] = useState("checking");
+  const [backendInfo, setBackendInfo] = useState(null);
+
+  async function fetchHealth() {
+    const result = await requestJSON("/health");
+    setBackendInfo(result?.data || null);
+    setBackendStatus("online");
+    return result?.data || null;
+  }
+
+  function markOffline() {
+    setBackendStatus("offline");
+  }
+
+  return {
+    backendStatus,
+    backendInfo,
+    fetchHealth,
+    markOffline
+  };
 }
 
 function TopNav({ currentPath }) {
@@ -123,7 +146,7 @@ function AnnouncementBar() {
       </span>
       <strong>公告</strong>
       <span className="announce-text">
-        当前先完成前后端联通：密钥管理读取 `/api/models` 和 `/api/keys`，其他模块先放置入口。
+        当前优先打通前后端联调：密钥管理已经接后端，渠道管理现在支持直接测试 DeepSeek 渠道。
       </span>
     </div>
   );
@@ -150,9 +173,16 @@ function SideBar({ currentPath }) {
         <span>密钥管理</span>
         <em className="sidebar-status">已接入</em>
       </a>
+      <a className={isPathActive(currentPath, "/app/channels") ? "sidebar-menu active" : "sidebar-menu"} href="/app/channels">
+        <span className="sidebar-menu-icon">
+          <Settings size={19} />
+        </span>
+        <span>渠道管理</span>
+        <em className="sidebar-status">可测试</em>
+      </a>
 
       <div className="sidebar-section-title">功能预留</div>
-      {reservedFeatures.slice(1).map((item) => {
+      {reservedFeatures.filter((item) => item.path !== "/app/channels").slice(1).map((item) => {
         const Icon = item.icon;
         return (
           <a
@@ -225,7 +255,7 @@ function KeyEditor({ draft, title, availableModels, onChange, onToggleModel, onS
       <div className="editor-head">
         <div>
           <h3>{title}</h3>
-          <p>保存后会直接写入后端 SQLite，后续 `/v1/chat/completions` 可使用这里生成的密钥。</p>
+          <p>保存后会直接写入后端 SQLite，后续 `/v1/chat/completions` 可使用这里生成的客户端密钥。</p>
         </div>
         <button className="table-icon-btn" onClick={onCancel} type="button" aria-label="关闭编辑面板">
           <X size={18} />
@@ -390,6 +420,22 @@ function mapKeyItem(item) {
   };
 }
 
+function mapChannelItem(item) {
+  return {
+    id: item.id,
+    name: item.name,
+    providerType: item.provider_type,
+    baseUrl: item.base_url,
+    groupName: item.group_name,
+    modelNames: item.model_names || [],
+    testModel: item.test_model || "",
+    enabled: item.enabled,
+    priority: item.priority || 0,
+    weight: item.weight || 0,
+    remark: item.remark || ""
+  };
+}
+
 function KeysPage({ currentPath }) {
   const [rows, setRows] = useState([]);
   const [availableModels, setAvailableModels] = useState(["deepseek-chat"]);
@@ -397,22 +443,15 @@ function KeysPage({ currentPath }) {
   const [showEditor, setShowEditor] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [backendStatus, setBackendStatus] = useState("checking");
-  const [backendInfo, setBackendInfo] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [draft, setDraft] = useState({
     name: "",
     quota: 100,
     modelNames: ["deepseek-chat"]
   });
+  const { backendStatus, backendInfo, fetchHealth, markOffline } = useBackendStatus();
 
   const selectedModelFallback = useMemo(() => [availableModels[0] || "deepseek-chat"], [availableModels]);
-
-  async function fetchHealth() {
-    const result = await requestJSON("/health");
-    setBackendInfo(result?.data || null);
-    setBackendStatus("online");
-  }
 
   async function fetchModels() {
     const result = await requestJSON("/api/models");
@@ -439,7 +478,7 @@ function KeysPage({ currentPath }) {
       setAvailableModels(models);
       setRows(keys);
     } catch (error) {
-      setBackendStatus("offline");
+      markOffline();
       setErrorMessage("后端连接失败，请确认 Go 服务已经启动。");
       console.error(error);
     } finally {
@@ -631,7 +670,7 @@ function KeysPage({ currentPath }) {
         <div className="info-banner">
           <KeyRound size={16} />
           <span>
-            当前页面已接入 `{API_BASE}/api/models`、`{API_BASE}/api/keys`，默认写入分组 `{DEFAULT_GROUP}`。
+            当前页面已接入 `{API_BASE}/api/models` 与 `{API_BASE}/api/keys`，默认写入分组 `{DEFAULT_GROUP}`。
           </span>
         </div>
 
@@ -682,6 +721,203 @@ function KeysPage({ currentPath }) {
   );
 }
 
+function ChannelResult({ result, errorMessage, loading }) {
+  if (loading) {
+    return <p className="inline-message">正在测试渠道，请稍候...</p>;
+  }
+
+  if (errorMessage) {
+    return <p className="inline-message error">{errorMessage}</p>;
+  }
+
+  if (!result) {
+    return (
+      <p className="inline-message">
+        点击“测试渠道”后，这里会显示耗时、测试模型和上游返回，方便判断 DeepSeek 渠道是否真的打通。
+      </p>
+    );
+  }
+
+  return (
+    <section className="channel-result-card">
+      <div className="channel-result-top">
+        <strong>最近一次测试成功</strong>
+        <span>{result.channel_name}</span>
+      </div>
+      <div className="channel-result-meta">
+        <span>模型：{result.model}</span>
+        <span>耗时：{result.latency_ms} ms</span>
+        <span>请求 ID：{result.response?.id || "-"}</span>
+      </div>
+      <pre className="channel-result-json">{JSON.stringify(result.response, null, 2)}</pre>
+    </section>
+  );
+}
+
+function ChannelsPage({ currentPath }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [testingId, setTestingId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [testErrorMessage, setTestErrorMessage] = useState("");
+  const [lastTestResult, setLastTestResult] = useState(null);
+  const { backendStatus, backendInfo, fetchHealth, markOffline } = useBackendStatus();
+
+  async function reloadChannels() {
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      await fetchHealth();
+      const result = await requestJSON("/api/channels");
+      setRows((result?.data?.items || []).map(mapChannelItem));
+    } catch (error) {
+      markOffline();
+      setErrorMessage("加载渠道失败，请确认后端服务已启动。");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    reloadChannels();
+  }, []);
+
+  async function handleTestChannel(channel) {
+    setTestingId(channel.id);
+    setTestErrorMessage("");
+    setLastTestResult(null);
+
+    try {
+      const result = await requestJSON(`/api/channels/${channel.id}/test`, {
+        method: "POST",
+        body: JSON.stringify({
+          model: channel.testModel || channel.modelNames[0] || "",
+          messages: ["hello from channel test"],
+          max_tokens: 64
+        })
+      });
+      setLastTestResult(result?.data || null);
+    } catch (error) {
+      setTestErrorMessage(error.message || "渠道测试失败。");
+      console.error(error);
+    } finally {
+      setTestingId(null);
+    }
+  }
+
+  return (
+    <main className="keys-layout">
+      <SideBar currentPath={currentPath} />
+
+      <section className="keys-main">
+        <div className="page-title-row">
+          <div className="title-left">
+            <h1>渠道管理</h1>
+            <p>先把 DeepSeek 渠道跑通。这里可以直接测试某个上游渠道是否可用。</p>
+          </div>
+          <div className="title-actions">
+            <button className="outline-action" onClick={reloadChannels} type="button">
+              <RefreshCcw size={18} />
+              刷新
+            </button>
+          </div>
+        </div>
+
+        <BackendStatus status={backendStatus} info={backendInfo} errorMessage={errorMessage} />
+
+        <div className="info-banner">
+          <Settings size={16} />
+          <span>
+            “测试渠道”会直接调用后端 `{API_BASE}/api/channels/:id/test`，绕过客户端 API Key，只检查这个渠道本身能不能连上上游。
+          </span>
+        </div>
+
+        {errorMessage ? <p className="inline-message error">{errorMessage}</p> : null}
+        {loading ? <p className="inline-message">正在加载渠道列表...</p> : null}
+
+        <section className="channel-grid">
+          {rows.map((channel) => (
+            <article className="channel-card" key={channel.id}>
+              <div className="channel-card-head">
+                <div>
+                  <h3>{channel.name}</h3>
+                  <p>{channel.providerType}</p>
+                </div>
+                <span className={channel.enabled ? "status-pill" : "status-pill status-pill-disabled"}>
+                  {channel.enabled ? "已启用" : "已禁用"}
+                </span>
+              </div>
+              <div className="channel-card-body">
+                <div className="channel-line">
+                  <strong>Base URL</strong>
+                  <span>{channel.baseUrl}</span>
+                </div>
+                <div className="channel-line">
+                  <strong>分组</strong>
+                  <span>{channel.groupName}</span>
+                </div>
+                <div className="channel-line">
+                  <strong>测试模型</strong>
+                  <span>{channel.testModel || channel.modelNames[0] || "-"}</span>
+                </div>
+                <div className="channel-line">
+                  <strong>模型列表</strong>
+                  <span>{channel.modelNames.length ? channel.modelNames.join(", ") : "-"}</span>
+                </div>
+                <div className="channel-line">
+                  <strong>优先级 / 权重</strong>
+                  <span>
+                    {channel.priority} / {channel.weight}
+                  </span>
+                </div>
+                {channel.remark ? (
+                  <div className="channel-remark">
+                    <strong>备注</strong>
+                    <span>{channel.remark}</span>
+                  </div>
+                ) : null}
+              </div>
+              <div className="channel-card-actions">
+                <button
+                  className="create-solid-btn"
+                  onClick={() => handleTestChannel(channel)}
+                  type="button"
+                  disabled={testingId === channel.id}
+                >
+                  <Sparkles size={18} />
+                  {testingId === channel.id ? "测试中..." : "测试渠道"}
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        {!rows.length && !loading ? (
+          <section className="token-table-card empty-state">
+            <div className="empty-copy">
+              <h3>暂无渠道</h3>
+              <p>请先在后端或后续页面中创建渠道记录，再来测试上游连通性。</p>
+            </div>
+          </section>
+        ) : null}
+
+        <div className="section-heading">
+          <h2>测试结果</h2>
+          <p>成功时会显示上游返回；失败时会直接显示后端错误信息。</p>
+        </div>
+        <ChannelResult result={lastTestResult} errorMessage={testErrorMessage} loading={testingId !== null} />
+      </section>
+
+      <button className="float-help" aria-label="联系客服" type="button">
+        <Headphones size={34} />
+        <span />
+      </button>
+    </main>
+  );
+}
+
 function PlaceholderPage({ title, icon: Icon, description }) {
   return (
     <main className="placeholder-page">
@@ -691,7 +927,7 @@ function PlaceholderPage({ title, icon: Icon, description }) {
         <p>{description}</p>
         <div className="placeholder-actions">
           <a className="create-solid-btn" href="/app/keys">
-            返回密钥管理
+            返回控制台
           </a>
           <button className="outline-action" type="button">
             暂不实现
@@ -734,13 +970,7 @@ function App() {
     );
   }
   if (path.includes("/channels")) {
-    page = (
-      <PlaceholderPage
-        title="渠道管理"
-        icon={Settings}
-        description="这里预留上游渠道、Base URL、API Key、权重和优先级配置。"
-      />
-    );
+    page = <ChannelsPage currentPath={path} />;
   }
   if (path.includes("/abilities")) {
     page = (
